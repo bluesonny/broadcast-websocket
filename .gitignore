@@ -3,3 +3,4 @@ config.json
 .git
 .idea
 .DS_Store
+broadcast-websocket

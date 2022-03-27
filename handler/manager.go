@@ -5,39 +5,45 @@ import (
 	. "broadcast-websocket/models"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
+	"time"
+
+	//"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
 	"io"
 	"log"
 	"net/http"
+	"nhooyr.io/websocket"
+	//"nhooyr.io/websocket/wsjson"
 )
 
-type ClientManager struct {
+type clientManager struct {
 	clients    map[*Client]bool
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
 }
 type Message struct {
-	Status  string `json:"recipient,omitempty"`
-	Content string `json:"content,omitempty"`
+	Status         string    `json:"status,omitempty"`
+	Content        string    `json:"content,omitempty"`
+	ClientSendTime time.Time `json:"client_send_time"`
 }
 
-func NewClientManager() ClientManager {
-	return ClientManager{
+func NewClientManager() clientManager {
+	return clientManager{
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
 	}
 }
-func (manager *ClientManager) WsHandle(res http.ResponseWriter, req *http.Request) {
+func (manager *clientManager) WsHandle(w http.ResponseWriter, req *http.Request) {
 	//解析一个连接
-	conn, error := (&websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}).Upgrade(res, req, nil)
-	if error != nil {
+	//conn, error := (&websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}).Upgrade(res, req, nil)
+	conn, err := websocket.Accept(w, req, &websocket.AcceptOptions{InsecureSkipVerify: true})
+	if err != nil {
 		//http.NotFound(res, req)
 		//http 请求一个输出
-		io.WriteString(res, "这是一个websocket,不是网站.")
+		io.WriteString(w, "这是一个websocket,不是网站.")
 		return
 	}
 
@@ -51,12 +57,12 @@ func (manager *ClientManager) WsHandle(res http.ResponseWriter, req *http.Reques
 	manager.register <- client
 
 	fmt.Println("起一个写协程...")
-	go client.Write(*manager)
+	go client.Write(req.Context(), *manager)
 	fmt.Println("监控连接断线...")
-	client.Read(*manager)
+	client.Read(req.Context(), *manager)
 }
 
-func (manager *ClientManager) Start() {
+func (manager *clientManager) Start() {
 	for {
 		select {
 		case conn := <-manager.register: //新客户端加入
@@ -92,10 +98,11 @@ func (manager *ClientManager) Start() {
 					delete(manager.clients, conn)
 				}
 			}
+			//fmt.Printf("共发送%d个客户端", len(manager.clients))
 		}
 	}
 }
-func (manager *ClientManager) Send() {
+func (manager *clientManager) Send() {
 
 	redisSubscribe := RedisClient.Subscribe(ViperConfig.Redis.Key)
 	_, err := redisSubscribe.Receive()
@@ -104,7 +111,8 @@ func (manager *ClientManager) Send() {
 		log.Fatal(err)
 	}
 	for msg := range redisSubscribe.Channel() {
-		jsonMessage, _ := json.Marshal(&Message{Status: "ok", Content: msg.Payload})
+		jsonMessage, _ := json.Marshal(&Message{Status: "ok", Content: msg.Payload, ClientSendTime: time.Now()})
+
 		fmt.Printf("redis读取数据：channel=%s message=%s\n", msg.Channel, msg.Payload)
 		manager.broadcast <- jsonMessage //激活start 程序 入广播管道
 	}
