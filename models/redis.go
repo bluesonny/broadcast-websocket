@@ -2,8 +2,8 @@ package models
 
 import (
 	. "broadcast-websocket/config"
-	"fmt"
 	"github.com/go-redis/redis"
+	"log"
 )
 
 var RedisClient *redis.Client
@@ -17,8 +17,8 @@ func init() {
 	_, err := RedisClient.Ping().Result()
 	//fmt.Println("Redis Client: " + pong)
 	if err == nil {
-		fmt.Println("redis 正常工作...")
+		log.Println("redis 正常工作...")
 	} else {
-		fmt.Printf("Redis Client err %v\n", err)
+		log.Printf("Redis Client err %v\n", err)
 	}
 }

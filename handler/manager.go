@@ -3,17 +3,13 @@ package handler
 import (
 	. "broadcast-websocket/config"
 	. "broadcast-websocket/models"
-	"fmt"
-	"strings"
-	"time"
-
-	//"github.com/gorilla/websocket"
 	uuid "github.com/satori/go.uuid"
 	"io"
 	"log"
 	"net/http"
 	"nhooyr.io/websocket"
-	//"nhooyr.io/websocket/wsjson"
+	"strings"
+	"time"
 )
 
 type clientManager struct {
@@ -53,12 +49,12 @@ func (manager *clientManager) WsHandle(w http.ResponseWriter, req *http.Request)
 	//初始化一个客户端对象
 	client := &Client{id: sha1, socket: conn, send: make(chan *Message)}
 	//把这个对象发送给 管道
-	fmt.Printf("把这个对象发送给注册管道...%v\n", client)
+	log.Printf("把这个对象发送给注册管道...%v\n", client)
 	manager.register <- client
 
-	fmt.Println("起一个写协程...")
+	log.Println("起一个写协程...")
 	go client.Write(req.Context(), *manager)
-	fmt.Println("监控连接断线...")
+	log.Println("监控连接是否断线...")
 	client.Read(req.Context(), *manager)
 }
 
@@ -66,35 +62,35 @@ func (manager *clientManager) Start() {
 	for {
 		select {
 		case conn := <-manager.register: //新客户端加入
-			fmt.Println("新客户端加入")
+			log.Println("新客户端加入")
 			manager.clients[conn] = true
-			fmt.Println("总客户端数：", len(manager.clients))
+			log.Println("总客户端数：", len(manager.clients))
 
 			//jsonMessage, _ := json.Marshal(&Message{Status: "ok", ClientSendTime: time.Now()})
 			msg := &Message{Status: "ok", ClientSendTime: time.Now()}
 			conn.send <- msg
 			//manager.send(jsonMessage, conn) //调用发送
 		case conn := <-manager.unregister:
-			fmt.Println("客户端离线")
+			log.Println("客户端离线")
 			if _, ok := manager.clients[conn]; ok {
-				fmt.Printf("关闭通道... %v\n", conn)
+				log.Printf("关闭通道... %v\n", conn)
 				close(conn.send)
-				fmt.Printf("关闭通道后，移除连接\n")
+				//fmt.Printf("关闭通道后，移除连接\n")
 				delete(manager.clients, conn)
-				fmt.Println("移除后总客户端数：", len(manager.clients))
+				log.Println("移除后总客户端数：", len(manager.clients))
 				//jsonMessage, _ := json.Marshal(&Message{Content: "a socket has disconnected."})
 				//manager.send(jsonMessage, conn)
 			}
 		case message := <-manager.broadcast: //读到广播管道数据后的处理
 			//fmt.Println("消息内容：" + string(message))
 			for conn := range manager.clients {
-				fmt.Println("每个客户端", conn.id)
+				log.Println("每个客户端发送数据：", conn.id)
 
 				select {
 				case conn.send <- message:
 					//fmt.Println("发送到每个每个客户端 ")
 				default:
-					fmt.Println("要关闭连接啊")
+					log.Println("要关闭连接啊")
 					close(conn.send)
 					delete(manager.clients, conn)
 				}
@@ -108,14 +104,15 @@ func (manager *clientManager) Send() {
 	redisSubscribe := RedisClient.Subscribe(ViperConfig.Redis.Key)
 	_, err := redisSubscribe.Receive()
 	if err != nil {
-		fmt.Printf("redis 订阅出错 %v\n", err)
+		log.Printf("redis 订阅出错 %v\n", err)
 		log.Fatal(err)
 	}
 	for msg := range redisSubscribe.Channel() {
 		msg.Payload = strings.Trim(msg.Payload, "\"")
 		//jsonMessage, _ := json.Marshal(&Message{Status: "ok", Content: msg.Payload, ClientSendTime: time.Now()})
 		sendMsg := &Message{Status: "ok", Content: msg.Payload, ClientSendTime: time.Now()}
-		fmt.Printf("redis读取数据：channel=%s message=%s\n", msg.Channel, msg.Payload)
+		//log.Printf("redis读取数据：channel=%sn", msg.Channel)
+		log.Printf("redis读取数据：channel=%s message=%s\n", msg.Channel, msg.Payload)
 		manager.broadcast <- sendMsg //激活start 程序 入广播管道
 	}
 
