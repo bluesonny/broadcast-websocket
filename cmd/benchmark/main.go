@@ -63,9 +63,10 @@ func UserConnect(nickname string) {
 		//if message.ClientSendTime.IsZero() {
 		//	continue
 		//}
-		if d := time.Now().Sub(message.ClientSendTime); d > 1*time.Second {
-			fmt.Printf("接收到服务端响应(%d)：%#v\n", d.Milliseconds(), message)
-		}
+		d := time.Now().Sub(message.ClientSendTime)
+		//d > 1*time.Second {
+		fmt.Printf("接收到服务端响应(%d)：%#v\n", d.Milliseconds(), message)
+		//}
 	}
 
 	conn.Close(websocket.StatusNormalClosure, "")

@@ -3,8 +3,8 @@ package handler
 import (
 	. "broadcast-websocket/config"
 	. "broadcast-websocket/models"
-	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	//"github.com/gorilla/websocket"
@@ -18,7 +18,7 @@ import (
 
 type clientManager struct {
 	clients    map[*Client]bool
-	broadcast  chan []byte
+	broadcast  chan *Message
 	register   chan *Client
 	unregister chan *Client
 }
@@ -30,7 +30,7 @@ type Message struct {
 
 func NewClientManager() clientManager {
 	return clientManager{
-		broadcast:  make(chan []byte),
+		broadcast:  make(chan *Message),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
@@ -51,7 +51,7 @@ func (manager *clientManager) WsHandle(w http.ResponseWriter, req *http.Request)
 	sha1 := uid.String()
 
 	//初始化一个客户端对象
-	client := &Client{id: sha1, socket: conn, send: make(chan []byte)}
+	client := &Client{id: sha1, socket: conn, send: make(chan *Message)}
 	//把这个对象发送给 管道
 	fmt.Printf("把这个对象发送给注册管道...%v\n", client)
 	manager.register <- client
@@ -70,8 +70,9 @@ func (manager *clientManager) Start() {
 			manager.clients[conn] = true
 			fmt.Println("总客户端数：", len(manager.clients))
 
-			jsonMessage, _ := json.Marshal(&Message{Content: "ok"})
-			conn.send <- jsonMessage
+			//jsonMessage, _ := json.Marshal(&Message{Status: "ok", ClientSendTime: time.Now()})
+			msg := &Message{Status: "ok", ClientSendTime: time.Now()}
+			conn.send <- msg
 			//manager.send(jsonMessage, conn) //调用发送
 		case conn := <-manager.unregister:
 			fmt.Println("客户端离线")
@@ -85,7 +86,7 @@ func (manager *clientManager) Start() {
 				//manager.send(jsonMessage, conn)
 			}
 		case message := <-manager.broadcast: //读到广播管道数据后的处理
-			fmt.Println("消息内容：" + string(message))
+			//fmt.Println("消息内容：" + string(message))
 			for conn := range manager.clients {
 				fmt.Println("每个客户端", conn.id)
 
@@ -111,10 +112,11 @@ func (manager *clientManager) Send() {
 		log.Fatal(err)
 	}
 	for msg := range redisSubscribe.Channel() {
-		jsonMessage, _ := json.Marshal(&Message{Status: "ok", Content: msg.Payload, ClientSendTime: time.Now()})
-
+		msg.Payload = strings.Trim(msg.Payload, "\"")
+		//jsonMessage, _ := json.Marshal(&Message{Status: "ok", Content: msg.Payload, ClientSendTime: time.Now()})
+		sendMsg := &Message{Status: "ok", Content: msg.Payload, ClientSendTime: time.Now()}
 		fmt.Printf("redis读取数据：channel=%s message=%s\n", msg.Channel, msg.Payload)
-		manager.broadcast <- jsonMessage //激活start 程序 入广播管道
+		manager.broadcast <- sendMsg //激活start 程序 入广播管道
 	}
 
 }

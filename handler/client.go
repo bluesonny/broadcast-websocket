@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -11,7 +10,7 @@ import (
 type Client struct {
 	id     string
 	socket *websocket.Conn
-	send   chan []byte
+	send   chan *Message
 }
 
 //监控连接状态
@@ -55,9 +54,9 @@ func (c *Client) Write(ctx context.Context, manager clientManager) {
 			}
 
 			//err := c.socket.WriteMessage(websocket.TextMessage, message)
-			var msg Message
-			json.Unmarshal(message, &msg)
-			err := wsjson.Write(ctx, c.socket, msg)
+			//var msg Message
+			//json.Unmarshal(message, &msg)
+			err := wsjson.Write(ctx, c.socket, message)
 			fmt.Printf("发送数据状态 %v\n", err)
 			fmt.Printf("发送数据状态连接 %v\n", c)
 			if err != nil {
