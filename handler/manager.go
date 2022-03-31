@@ -3,6 +3,7 @@ package handler
 import (
 	. "broadcast-websocket/config"
 	. "broadcast-websocket/models"
+	"context"
 	uuid "github.com/satori/go.uuid"
 	"io"
 	"log"
@@ -99,10 +100,10 @@ func (manager *clientManager) Start() {
 		}
 	}
 }
-func (manager *clientManager) Send() {
-
-	redisSubscribe := RedisClient.Subscribe(ViperConfig.Redis.Key)
-	_, err := redisSubscribe.Receive()
+func (manager *clientManager) RedisSend() {
+	var ctx = context.Background()
+	redisSubscribe := RedisClient.Subscribe(ctx, ViperConfig.Redis.Key)
+	_, err := redisSubscribe.Receive(ctx)
 	if err != nil {
 		log.Printf("redis 订阅出错 %v\n", err)
 		log.Fatal(err)
