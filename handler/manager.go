@@ -112,8 +112,8 @@ func (manager *clientManager) RedisSend() {
 		msg.Payload = strings.Trim(msg.Payload, "\"")
 		//jsonMessage, _ := json.Marshal(&Message{Status: "ok", Content: msg.Payload, ClientSendTime: time.Now()})
 		sendMsg := &Message{Status: "ok", Content: msg.Payload, ClientSendTime: time.Now()}
-		//log.Printf("redis读取数据：channel=%sn", msg.Channel)
-		log.Printf("redis读取数据：channel=%s message=%s\n", msg.Channel, msg.Payload)
+		log.Printf("redis读取数据：channel=%s\n", msg.Channel)
+		//log.Printf("redis读取数据：channel=%s message=%s\n", msg.Channel, msg.Payload)
 		manager.broadcast <- sendMsg //激活start 程序 入广播管道
 	}
 
